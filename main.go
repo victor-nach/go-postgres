@@ -43,9 +43,9 @@ var books = AllBooks{
 }
 
 type APIResponse struct {
-	Status		int				`json:"status,	omitempty"`
-	Message		string			`json:"message,	omitempty"`
-	Data		interface{}		`json:"data,	omitempty"`
+	Status		int				`json:"status,omitempty"`
+	Message		string			`json:"message,omitempty"`
+	Data		interface{}		`json:"data,omitempty"`
 }
 
 func main() {
@@ -53,12 +53,13 @@ func main() {
 	// retuns a *mux.Router instance
 	// we can then attach routes(*mux.Route) to it
 	// the returned router implements the http.Handler interface so it can as well be served as a handler
-	router := mux.NewRouter()
+	router := mux.NewRouter().StrictSlash(true)
 
 	// perfoms in a similar way to http.handleFunc
 	// it is one of the methods that returns a route (*Route) that the mux.Router attaches to it's map
 	// it is also a method on the mux.Route interface
 	router.HandleFunc("/", welcome)
+	router.HandleFunc("/books", GetAllBooks)
 
 	PORT := "3000"
 	log.Println("serving on port:", PORT)
@@ -80,4 +81,13 @@ func welcome(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response);
+}
+
+func GetAllBooks(w http.ResponseWriter, r *http.Request) {
+	response := APIResponse{
+		Status: 200,
+		Message: "All books",
+		Data: books,
+	}
+	json.NewEncoder(w).Encode(response)
 }
