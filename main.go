@@ -2,12 +2,51 @@ package main
 
 import (
 	"net/http"
+	"encoding/json"
 	"log"
 	// "encoding/json"
 	// "fmt"
 
 	"github.com/gorilla/mux"
 )
+
+// define the book type and its properties
+type Book struct {
+	ID		int		`json:"id,		omitempty"`
+	Name 	string	`json:"name,	omitempty"`
+	Type 	string	`json:"type,	omitempty"`
+	Author  string	`json:"author,	omitempty"`
+}
+
+type AllBooks []Book
+
+// our own dummy database 
+var books = AllBooks{
+	{
+		ID: 1,
+		Name: "Into the badlands",
+		Type: "adventure",
+		Author: "Victor Iheanacho",
+	},
+	{
+		ID: 1,
+		Name: "50 shades of grey",
+		Type: "romance",
+		Author: "Victor Iheanacho",
+	},
+	{
+		ID: 1,
+		Name: "Charlie and the chocolate factory",
+		Type: "adventure",
+		Author: "Emmanuel Iheanacho",
+	},
+}
+
+type APIResponse struct {
+	Status		int				`json:"status,	omitempty"`
+	Message		string			`json:"message,	omitempty"`
+	Data		interface{}		`json:"data,	omitempty"`
+}
 
 func main() {
 
@@ -35,18 +74,10 @@ func main() {
 // sample handler function, takes in a response writer for the response and a http.Request
 // you can write headers and also the content of the response to the writer
 func welcome(w http.ResponseWriter, r *http.Request) {
-
-	// the write method here takes in a byte array
-	// writes the array to the stream and waits for the stream to be finished reading
-	w.Write([]byte("welcome"))
-
-	// another way to write to w using Fprint
-	// Fprint writes to w after formatting the operand using it's default formatter
-	// fmt.Fprint(w, "welcome")
-
-	// we can also use json.Encode to write json to the response
-	// first we create a new encoder using the response stream
-	// the Encoder type interface has an Encode method that writes a json interface to a stream
-	// the data interface can be a struct, it would use the json tags in the struct to marshall the data
-	// json.NewEncoder(w).Encode(json interface{})
+	response := APIResponse{
+		Status: 200,
+		Message: "Welcome !",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response);
 }
