@@ -15,10 +15,10 @@ import (
 
 // define the book type and its properties
 type Book struct {
-	ID     int    `json:"id,		omitempty"`
-	Name   string `json:"name,	omitempty"`
-	Type   string `json:"type,	omitempty"`
-	Author string `json:"author,	omitempty"`
+	ID     int    `json:"id,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Type   string `json:"type,omitempty"`
+	Author string `json:"author,omitempty"`
 }
 
 type AllBooks []Book
@@ -65,6 +65,7 @@ func main() {
 	router.HandleFunc("/", welcome).Methods("GET")
 	router.HandleFunc("/books", GetAllBooks).Methods("GET")
 	router.HandleFunc("/books/{id}", GetSingleBook).Methods("GET")
+	router.HandleFunc("/books/{id}", UpdateBook).Methods("PATCH")
 	router.HandleFunc("/books", AddBook).Methods("POST")
 
 	PORT := "3000"
@@ -106,7 +107,6 @@ func GetSingleBook(w http.ResponseWriter, r *http.Request) {
 	bookId := mux.Vars(r)["id"]
 	bookIdInt, _ := strconv.Atoi(bookId)
 	for _, singleBook := range books {
-		fmt.Println(singleBook.ID, bookIdInt)
 		if singleBook.ID == bookIdInt {
 
 			// if a match is found return that match
@@ -131,13 +131,21 @@ func AddBook(w http.ResponseWriter, r *http.Request) {
 
 	// the read all method reads from a reader until all the data has been read
 	// it returns the data a a byte array
-	reqBody, err := ioutil.ReadAll(r.Body)
-	err = json.Unmarshal(reqBody, &singleBook)
+	// doesn't return error if the 
+	reqBody, _ := ioutil.ReadAll(r.Body)
+
+	// unmarshall would fail for an invalid request body
+	// would not fail if there's an extra field or missing field
+	err := json.Unmarshal(reqBody, &singleBook)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
 
 	singleBook.ID = len(books) + 1
+
+	// append is the built in function that appends elements to the end of a slice
+	// if is has sufficient capacity(slice has been declared to take more elements) the original slice is resliced to take the new addition
+	// it always returns the original slice, it is common practice to store the result in the original slice
 	books = append(books, singleBook)
 
 	w.WriteHeader(http.StatusCreated)
@@ -149,4 +157,33 @@ func AddBook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(response)
+}
+
+func UpdateBook(w http.ResponseWriter, r *http.Request) {
+	var updatedBook Book
+	bookId := mux.Vars(r)["id"]
+	bookIdInt, _ := strconv.Atoi(bookId)
+
+	reqBody, _ := ioutil.ReadAll(r.Body)
+	json.Unmarshal(reqBody, &updatedBook)
+	for i, singleBook := range books {
+		if singleBook.ID == bookIdInt {
+			singleBook.Name = updatedBook.Name
+			singleBook.Type =  updatedBook.Type
+
+			// this is how to update an element in a slice
+			// you have to pass in an item belonging in the original slice
+			books = append(books[:i], singleBook)
+
+			// if a match is found return that match
+			response := APIResponse{
+				Status:  http.StatusOK,
+				Message: "All books",
+				Data:    books,
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+	}
+
 }
