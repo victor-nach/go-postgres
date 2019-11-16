@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"fmt"
 	"log"
 	"net/http"
@@ -61,9 +62,10 @@ func main() {
 	// perfoms in a similar way to http.handleFunc
 	// it is one of the methods that returns a route (*Route) that the mux.Router attaches to it's map
 	// it is also a method on the mux.Route interface
-	router.HandleFunc("/", welcome)
-	router.HandleFunc("/books", GetAllBooks)
-	router.HandleFunc("/books/{id}", GetSingleBook)
+	router.HandleFunc("/", welcome).Methods("GET")
+	router.HandleFunc("/books", GetAllBooks).Methods("GET")
+	router.HandleFunc("/books/{id}", GetSingleBook).Methods("GET")
+	router.HandleFunc("/books", AddBook).Methods("POST")
 
 	PORT := "3000"
 	log.Println("serving on port:", PORT)
@@ -89,7 +91,7 @@ func welcome(w http.ResponseWriter, r *http.Request) {
 
 func GetAllBooks(w http.ResponseWriter, r *http.Request) {
 	response := APIResponse{
-		Status:  200,
+		Status:  http.StatusOK,
 		Message: "All books",
 		Data:    books,
 	}
@@ -109,7 +111,7 @@ func GetSingleBook(w http.ResponseWriter, r *http.Request) {
 
 			// if a match is found return that match
 			response := APIResponse{
-				Status:  200,
+				Status:  http.StatusOK,
 				Message: "All books",
 				Data:    singleBook,
 			}
@@ -118,8 +120,33 @@ func GetSingleBook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	response := APIResponse{
-		Status:  404,
+		Status:  http.StatusNotFound,
 		Error: "Not found",
 	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func AddBook(w http.ResponseWriter, r *http.Request) {
+	var singleBook Book
+
+	// the read all method reads from a reader until all the data has been read
+	// it returns the data a a byte array
+	reqBody, err := ioutil.ReadAll(r.Body)
+	err = json.Unmarshal(reqBody, &singleBook)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	singleBook.ID = len(books) + 1
+	books = append(books, singleBook)
+
+	w.WriteHeader(http.StatusCreated)
+
+	response := APIResponse{
+		Status:  http.StatusCreated,
+		Message: "book successfuly created",
+		Data:    singleBook,
+	}
+
 	json.NewEncoder(w).Encode(response)
 }
