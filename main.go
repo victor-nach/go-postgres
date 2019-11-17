@@ -66,6 +66,7 @@ func main() {
 	router.HandleFunc("/books", GetAllBooks).Methods("GET")
 	router.HandleFunc("/books/{id}", GetSingleBook).Methods("GET")
 	router.HandleFunc("/books/{id}", UpdateBook).Methods("PATCH")
+	router.HandleFunc("/books/{id}", DeleteBook).Methods("DELETE")
 	router.HandleFunc("/books", AddBook).Methods("POST")
 
 	PORT := "3000"
@@ -186,4 +187,28 @@ func UpdateBook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+}
+
+func DeleteBook(w http.ResponseWriter, r *http.Request) {
+	bookId := mux.Vars(r)["id"]
+	bookIdInt, _ := strconv.Atoi(bookId)
+
+	for i, singleBook := range books {
+		if singleBook.ID == bookIdInt {
+			books = append(books[:i], books[i+1:]...)
+		}
+		// if a match is found return that match
+		response := APIResponse{
+			Status:  http.StatusOK,
+			Message: "events have been successfully deleted",
+			Data:    books,
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+	response := APIResponse{
+		Status:  http.StatusNotFound,
+		Error: "Not found",
+	}
+	json.NewEncoder(w).Encode(response)
 }
