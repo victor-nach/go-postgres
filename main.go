@@ -16,7 +16,8 @@ import (
 
 // define the book type and its properties
 type Book struct {
-	ID     int    `json:"id,omitempty"`
+	gorm.Model
+	// ID     int    `json:"id,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Type   string `json:"type,omitempty"`
 	Author string `json:"author,omitempty"`
@@ -27,19 +28,19 @@ type AllBooks []Book
 // our own dummy database
 var books = AllBooks{
 	{
-		ID:     1,
+		// ID:     1,
 		Name:   "Into the badlands",
 		Type:   "adventure",
 		Author: "Victor Iheanacho",
 	},
 	{
-		ID:     2,
+		// ID:     2,
 		Name:   "50 shades of grey",
 		Type:   "romance",
 		Author: "Victor Iheanacho",
 	},
 	{
-		ID:     3,
+		// ID:     3,
 		Name:   "Charlie and the chocolate factory",
 		Type:   "adventure",
 		Author: "Emmanuel Iheanacho",
@@ -117,7 +118,7 @@ func GetAllBooks(w http.ResponseWriter, r *http.Request) {
 	// create empty slice to hold data
 	var books []Book
 	db.Find(&books) // SELECT * FROM books;
-	
+
 	response := APIResponse{
 		Status:  http.StatusOK,
 		Message: "All books",
@@ -134,7 +135,7 @@ func GetSingleBook(w http.ResponseWriter, r *http.Request) {
 	bookID := mux.Vars(r)["id"]
 	bookIDInt, _ := strconv.Atoi(bookID)
 	for _, singleBook := range books {
-		if singleBook.ID == bookIDInt {
+		if singleBook.ID == uint(bookIDInt) {
 
 			// if a match is found return that match
 			response := APIResponse{
@@ -159,21 +160,25 @@ func AddBook(w http.ResponseWriter, r *http.Request) {
 	// the read all method reads from a reader until all the data has been read
 	// it returns the data a a byte array
 	// doesn't return error if the 
-	reqBody, _ := ioutil.ReadAll(r.Body)
+	reqBody, err := ioutil.ReadAll(r.Body)
 
-	// unmarshall would fail for an invalid request body
+	if err != nil {
+		log.Println(err)
+	}
+
+	// unmarshall would only fail for an invalid request body
 	// would not fail if there's an extra field or missing field
-	err := json.Unmarshal(reqBody, &singleBook)
+	// would not also fail if there's no recognizable field
+	err = json.Unmarshal(reqBody, &singleBook)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
 
-	singleBook.ID = len(books) + 1
-
-	// append is the built in function that appends elements to the end of a slice
-	// if is has sufficient capacity(slice has been declared to take more elements) the original slice is resliced to take the new addition
-	// it always returns the original slice, it is common practice to store the result in the original slice
-	books = append(books, singleBook)
+	// it automatically knows which table to put the data in
+	err = db.Create(&singleBook).Error
+	if err != nil {
+		log.Println(err)
+	}
 
 	w.WriteHeader(http.StatusCreated)
 
@@ -194,7 +199,7 @@ func UpdateBook(w http.ResponseWriter, r *http.Request) {
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(reqBody, &updatedBook)
 	for i, singleBook := range books {
-		if singleBook.ID == bookIDInt {
+		if singleBook.ID == uint(bookIDInt) {
 			singleBook.Name = updatedBook.Name
 			singleBook.Type =  updatedBook.Type
 
@@ -220,7 +225,7 @@ func DeleteBook(w http.ResponseWriter, r *http.Request) {
 	bookIDInt, _ := strconv.Atoi(bookID)
 
 	for i, singleBook := range books {
-		if singleBook.ID == bookIDInt {
+		if singleBook.ID == uint(bookIDInt) {
 			books = append(books[:i], books[i+1:]...)
 		}
 		// if a match is found return that match
