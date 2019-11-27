@@ -132,25 +132,31 @@ func GetSingleBook(w http.ResponseWriter, r *http.Request) {
 	// returns the request parameter (routes variables) for the request and nil if none
 	// it takes in http.Requeust as parameter, and it returns a map
 	// we can then pick the exact value we are looking for from the map
-	bookID := mux.Vars(r)["id"]
-	bookIDInt, _ := strconv.Atoi(bookID)
-	for _, singleBook := range books {
-		if singleBook.ID == uint(bookIDInt) {
-
-			// if a match is found return that match
-			response := APIResponse{
-				Status:  http.StatusOK,
-				Message: "All books",
-				Data:    singleBook,
-			}
-			json.NewEncoder(w).Encode(response)
-			return
+	id := mux.Vars(r)["id"]
+	// find by ID 
+	var book Book
+	// this pattern only works where the id is the primary key and is also an integer 
+	err := db.First(&book, id).Error // select all from users where id = id
+	
+	if err != nil {
+		log.Println(err)
+		
+		// if book not found
+		response := APIResponse{
+			Status:  http.StatusNotFound,
+			Error: "Not found",
 		}
+		json.NewEncoder(w).Encode(response)
+		return
 	}
+
+	// if a match is found return that match
 	response := APIResponse{
-		Status:  http.StatusNotFound,
-		Error: "Not found",
+		Status:  http.StatusOK,
+		Message: "All books",
+		Data:    book,
 	}
+	
 	json.NewEncoder(w).Encode(response)
 }
 
