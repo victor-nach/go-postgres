@@ -7,15 +7,17 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	// "encoding/json"
-	// "fmt"
 
 	"github.com/gorilla/mux"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+
 )
 
 // define the book type and its properties
 type Book struct {
-	ID     int    `json:"id,omitempty"`
+	gorm.Model
+	// ID     int    `json:"id,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Type   string `json:"type,omitempty"`
 	Author string `json:"author,omitempty"`
@@ -26,19 +28,19 @@ type AllBooks []Book
 // our own dummy database
 var books = AllBooks{
 	{
-		ID:     1,
+		// ID:     1,
 		Name:   "Into the badlands",
 		Type:   "adventure",
 		Author: "Victor Iheanacho",
 	},
 	{
-		ID:     2,
+		// ID:     2,
 		Name:   "50 shades of grey",
 		Type:   "romance",
 		Author: "Victor Iheanacho",
 	},
 	{
-		ID:     3,
+		// ID:     3,
 		Name:   "Charlie and the chocolate factory",
 		Type:   "adventure",
 		Author: "Emmanuel Iheanacho",
@@ -52,7 +54,26 @@ type APIResponse struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+var db *gorm.DB
+
 func main() {
+
+	// Connect to the database
+	connectionString := "postgres://xlvhtudc:vmE-X-O8YCDLByk_g1jwV_KacKb_dj2E@raja.db.elephantsql.com:5432/xlvhtudc"
+	var err error
+	db, err = gorm.Open("postgres", connectionString)
+
+	if err != nil {
+		log.Println("Could not connect to the db")
+		log.Fatal(err)
+	}
+	log.Println("Succesfully connected to the db")
+	// close connection after the call to the database connection
+	defer db.Close()
+
+	db.AutoMigrate(&Book{})
+	log.Println("Migrated book table")
+
 
 	// retuns a *mux.Router instance
 	// we can then attach routes(*mux.Route) to it
@@ -78,6 +99,7 @@ func main() {
 	// it takes in the port and the handler, if the handler is nil, the DefaultServeMux is used
 	// it always returns a non-nil error
 	log.Fatal(http.ListenAndServe(":"+PORT, router))
+
 }
 
 // sample handler function, takes in a response writer for the response and a http.Request
@@ -92,6 +114,11 @@ func welcome(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAllBooks(w http.ResponseWriter, r *http.Request) {
+
+	// create empty slice to hold data
+	var books []Book
+	db.Find(&books) // SELECT * FROM books;
+
 	response := APIResponse{
 		Status:  http.StatusOK,
 		Message: "All books",
@@ -105,25 +132,31 @@ func GetSingleBook(w http.ResponseWriter, r *http.Request) {
 	// returns the request parameter (routes variables) for the request and nil if none
 	// it takes in http.Requeust as parameter, and it returns a map
 	// we can then pick the exact value we are looking for from the map
-	bookId := mux.Vars(r)["id"]
-	bookIdInt, _ := strconv.Atoi(bookId)
-	for _, singleBook := range books {
-		if singleBook.ID == bookIdInt {
-
-			// if a match is found return that match
-			response := APIResponse{
-				Status:  http.StatusOK,
-				Message: "All books",
-				Data:    singleBook,
-			}
-			json.NewEncoder(w).Encode(response)
-			return
+	id := mux.Vars(r)["id"]
+	// find by ID 
+	var book Book
+	// this pattern only works where the id is the primary key and is also an integer 
+	err := db.First(&book, id).Error // select all from users where id = id
+	
+	if err != nil {
+		log.Println(err)
+		
+		// if book not found
+		response := APIResponse{
+			Status:  http.StatusNotFound,
+			Error: "Not found",
 		}
+		json.NewEncoder(w).Encode(response)
+		return
 	}
+
+	// if a match is found return that match
 	response := APIResponse{
-		Status:  http.StatusNotFound,
-		Error: "Not found",
+		Status:  http.StatusOK,
+		Message: "All books",
+		Data:    book,
 	}
+	
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -133,21 +166,25 @@ func AddBook(w http.ResponseWriter, r *http.Request) {
 	// the read all method reads from a reader until all the data has been read
 	// it returns the data a a byte array
 	// doesn't return error if the 
-	reqBody, _ := ioutil.ReadAll(r.Body)
+	reqBody, err := ioutil.ReadAll(r.Body)
 
-	// unmarshall would fail for an invalid request body
+	if err != nil {
+		log.Println(err)
+	}
+
+	// unmarshall would only fail for an invalid request body
 	// would not fail if there's an extra field or missing field
-	err := json.Unmarshal(reqBody, &singleBook)
+	// would not also fail if there's no recognizable field
+	err = json.Unmarshal(reqBody, &singleBook)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
 
-	singleBook.ID = len(books) + 1
-
-	// append is the built in function that appends elements to the end of a slice
-	// if is has sufficient capacity(slice has been declared to take more elements) the original slice is resliced to take the new addition
-	// it always returns the original slice, it is common practice to store the result in the original slice
-	books = append(books, singleBook)
+	// it automatically knows which table to put the data in
+	err = db.Create(&singleBook).Error
+	if err != nil {
+		log.Println(err)
+	}
 
 	w.WriteHeader(http.StatusCreated)
 
@@ -162,13 +199,13 @@ func AddBook(w http.ResponseWriter, r *http.Request) {
 
 func UpdateBook(w http.ResponseWriter, r *http.Request) {
 	var updatedBook Book
-	bookId := mux.Vars(r)["id"]
-	bookIdInt, _ := strconv.Atoi(bookId)
+	bookID := mux.Vars(r)["id"]
+	bookIDInt, _ := strconv.Atoi(bookID)
 
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(reqBody, &updatedBook)
 	for i, singleBook := range books {
-		if singleBook.ID == bookIdInt {
+		if singleBook.ID == uint(bookIDInt) {
 			singleBook.Name = updatedBook.Name
 			singleBook.Type =  updatedBook.Type
 
@@ -190,11 +227,11 @@ func UpdateBook(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteBook(w http.ResponseWriter, r *http.Request) {
-	bookId := mux.Vars(r)["id"]
-	bookIdInt, _ := strconv.Atoi(bookId)
+	bookID := mux.Vars(r)["id"]
+	bookIDInt, _ := strconv.Atoi(bookID)
 
 	for i, singleBook := range books {
-		if singleBook.ID == bookIdInt {
+		if singleBook.ID == uint(bookIDInt) {
 			books = append(books[:i], books[i+1:]...)
 		}
 		// if a match is found return that match
