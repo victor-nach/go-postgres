@@ -7,10 +7,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	// "encoding/json"
-	// "fmt"
 
 	"github.com/gorilla/mux"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+
 )
 
 // define the book type and its properties
@@ -52,7 +53,26 @@ type APIResponse struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+var db *gorm.DB
+
 func main() {
+
+	// Connect to the database
+	connectionString := "postgres://xlvhtudc:vmE-X-O8YCDLByk_g1jwV_KacKb_dj2E@raja.db.elephantsql.com:5432/xlvhtudc"
+	var err error
+	db, err = gorm.Open("postgres", connectionString)
+
+	if err != nil {
+		log.Println("Could not connect to the db")
+		log.Fatal(err)
+	}
+	log.Println("Succesfully connected to the db")
+	// close connection after the call to the database connection
+	defer db.Close()
+
+	db.AutoMigrate(&Book{})
+	log.Println("Migrated book table")
+
 
 	// retuns a *mux.Router instance
 	// we can then attach routes(*mux.Route) to it
@@ -78,6 +98,7 @@ func main() {
 	// it takes in the port and the handler, if the handler is nil, the DefaultServeMux is used
 	// it always returns a non-nil error
 	log.Fatal(http.ListenAndServe(":"+PORT, router))
+
 }
 
 // sample handler function, takes in a response writer for the response and a http.Request
@@ -92,6 +113,11 @@ func welcome(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAllBooks(w http.ResponseWriter, r *http.Request) {
+
+	// create empty slice to hold data
+	var books []Book
+	db.Find(&books) // SELECT * FROM books;
+	
 	response := APIResponse{
 		Status:  http.StatusOK,
 		Message: "All books",
@@ -105,10 +131,10 @@ func GetSingleBook(w http.ResponseWriter, r *http.Request) {
 	// returns the request parameter (routes variables) for the request and nil if none
 	// it takes in http.Requeust as parameter, and it returns a map
 	// we can then pick the exact value we are looking for from the map
-	bookId := mux.Vars(r)["id"]
-	bookIdInt, _ := strconv.Atoi(bookId)
+	bookID := mux.Vars(r)["id"]
+	bookIDInt, _ := strconv.Atoi(bookID)
 	for _, singleBook := range books {
-		if singleBook.ID == bookIdInt {
+		if singleBook.ID == bookIDInt {
 
 			// if a match is found return that match
 			response := APIResponse{
@@ -162,13 +188,13 @@ func AddBook(w http.ResponseWriter, r *http.Request) {
 
 func UpdateBook(w http.ResponseWriter, r *http.Request) {
 	var updatedBook Book
-	bookId := mux.Vars(r)["id"]
-	bookIdInt, _ := strconv.Atoi(bookId)
+	bookID := mux.Vars(r)["id"]
+	bookIDInt, _ := strconv.Atoi(bookID)
 
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(reqBody, &updatedBook)
 	for i, singleBook := range books {
-		if singleBook.ID == bookIdInt {
+		if singleBook.ID == bookIDInt {
 			singleBook.Name = updatedBook.Name
 			singleBook.Type =  updatedBook.Type
 
@@ -190,11 +216,11 @@ func UpdateBook(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteBook(w http.ResponseWriter, r *http.Request) {
-	bookId := mux.Vars(r)["id"]
-	bookIdInt, _ := strconv.Atoi(bookId)
+	bookID := mux.Vars(r)["id"]
+	bookIDInt, _ := strconv.Atoi(bookID)
 
 	for i, singleBook := range books {
-		if singleBook.ID == bookIdInt {
+		if singleBook.ID == bookIDInt {
 			books = append(books[:i], books[i+1:]...)
 		}
 		// if a match is found return that match
